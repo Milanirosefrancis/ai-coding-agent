@@ -1,16 +1,19 @@
-from agent import ask_agent
-from rich import print
+from agent import ask_agent, autonomous_loop
 
-print("\n[bold cyan]Claude Agent Clone[/bold cyan]")
-print("[yellow]Type 'exit' to quit[/yellow]\n")
+print("Claude Agent Clone")
+print("Type 'exit' to quit")
 
 while True:
-
-    user_input = input("[bold green]You:[/bold green] ")
+    user_input = input("You: ")
 
     if user_input.lower() == "exit":
         break
 
-    response = ask_agent(user_input)
+    if user_input.startswith("auto"):
+        task = user_input.replace("auto ", "")
+        result = autonomous_loop(task)
+        print("Agent:", result)
 
-    print("\n[bold blue]AI:[/bold blue]", response)
+    else:
+        response = ask_agent(user_input)
+        print("Agent:", response)

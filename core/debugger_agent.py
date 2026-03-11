@@ -1,6 +1,6 @@
 import ollama
 
-MODEL = "deepseek-coder:1.3b"
+MODEL = "llama3"
 
 def debug_error(error):
 

@@ -1,0 +1,9 @@
+Project: Claude Agent Clone
+
+This project builds a local AI coding assistant using Ollama.
+
+Capabilities:
+- Chat with AI
+- Analyse code
+- Read project files
+- Help developers write code

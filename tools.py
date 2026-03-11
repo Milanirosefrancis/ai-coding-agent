@@ -49,3 +49,9 @@ def run_python(file):
         return result.stdout + result.stderr
     except Exception as e:
         return f"Error running python file: {str(e)}"
+def create_folder(path):
+    try:
+        os.makedirs(path, exist_ok=True)
+        return f"Folder '{path}' created successfully"
+    except Exception as e:
+        return f"Error creating folder: {str(e)}"
