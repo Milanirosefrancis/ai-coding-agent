@@ -1,20 +1,62 @@
-import ollama
+def generate_flask_project(project_name):
 
-MODEL = "deepseek-coder:1.3b"
+    return {
+        "tasks":[
 
-def generate_code(task):
+            {
+                "tool":"create_folder",
+                "args":{"path": project_name}
+            },
 
-    prompt = f"""
-You are a coding AI.
+            {
+                "tool":"write_file",
+                "args":{
+                    "path": f"{project_name}/app.py",
+                    "content": """
+from flask import Flask
+from routes import api
 
-Write code to complete this task:
+app = Flask(__name__)
 
-{task}
+app.register_blueprint(api)
+
+if __name__ == "__main__":
+    app.run(debug=True)
 """
+                }
+            },
 
-    response = ollama.chat(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}]
-    )
+            {
+                "tool":"write_file",
+                "args":{
+                    "path": f"{project_name}/routes.py",
+                    "content": """
+from flask import Blueprint, jsonify
 
-    return response["message"]["content"]
+api = Blueprint('api', __name__)
+
+@api.route("/")
+def home():
+    return jsonify({"message":"API running"})
+"""
+                }
+            },
+
+            {
+                "tool":"write_file",
+                "args":{
+                    "path": f"{project_name}/requirements.txt",
+                    "content": "flask"
+                }
+            },
+
+            {
+                "tool":"write_file",
+                "args":{
+                    "path": f"{project_name}/README.md",
+                    "content": "# Flask API Project"
+                }
+            }
+
+        ]
+    }

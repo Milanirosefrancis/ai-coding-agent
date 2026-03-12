@@ -7,6 +7,7 @@ from vector_memory import store_memory, search_memory
 
 # Multi-Agent imports
 from core.planner_agent import create_plan
+from core.coder_agent import generate_flask_project
 from core.debugger_agent import debug_error
 
 from state_manager import AgentState
@@ -194,6 +195,20 @@ Current plan:
     answer = response["message"]["content"]
 
     print("\nModel Output:\n", answer)
+    # -----------------------------
+    # FLASK PROJECT GENERATION
+    # -----------------------------
+    if "flask api" in answer.lower() or "flask project" in answer.lower():
+
+        project_name = "flask_api"
+
+        tasks = generate_flask_project(project_name)
+
+        print("Generating Flask project...")
+
+        results = execute_task_list(tasks["tasks"])
+
+        return results
 
     # -----------------------------
     # TOOL EXECUTION
