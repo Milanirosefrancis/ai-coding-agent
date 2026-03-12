@@ -8,14 +8,16 @@ An autonomous AI coding assistant built with:
 - Multi-Agent Architecture
 - Automatic Tool Execution
 
-## Features
+AI Coding Agent
 
-- Project analysis
-- File reading/writing
-- Code execution
-- Persistent memory
-- Semantic vector memory
-- Planner / Coder / Debugger agents
+Features
+
+• Autonomous project generation
+• Multi-agent architecture
+• GitHub repository analysis
+• Universal link analysis
+• Local LLM execution via Ollama
+• Code debugging and execution
 
 ## Architecture
 
