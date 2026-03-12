@@ -51,7 +51,16 @@ def run_python(file):
         return f"Error running python file: {str(e)}"
 def create_folder(path):
     try:
-        os.makedirs(path, exist_ok=True)
-        return f"Folder '{path}' created successfully"
+        base_dir = os.getcwd()
+
+        # only keep folder name (ignore model paths)
+        folder_name = os.path.basename(path)
+
+        full_path = os.path.join(base_dir, folder_name)
+
+        os.makedirs(full_path, exist_ok=True)
+
+        return f"Folder '{folder_name}' created in project directory"
+
     except Exception as e:
         return f"Error creating folder: {str(e)}"
