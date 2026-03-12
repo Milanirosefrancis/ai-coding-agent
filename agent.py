@@ -7,7 +7,6 @@ from vector_memory import store_memory, search_memory
 
 # Multi-Agent imports
 from core.planner_agent import create_plan
-from core.coder_agent import generate_code
 from core.debugger_agent import debug_error
 
 from state_manager import AgentState
@@ -36,9 +35,9 @@ def execute_tool(tool, args):
             args.get("path"),
             args.get("content")
         )
+
     elif tool == "create_folder":
         result = create_folder(args.get("path"))
-    
 
     elif tool == "run_python":
         result = run_python(args.get("file"))
@@ -49,6 +48,41 @@ def execute_tool(tool, args):
     print("Tool result:", result)
 
     return result
+
+
+# -----------------------------
+# MULTI TASK EXECUTOR
+# -----------------------------
+def execute_task_list(tasks):
+
+    results = []
+
+    for task in tasks:
+
+        tool = task.get("tool")
+        args = task.get("args", {})
+
+        print("\nExecuting task:", tool)
+
+        result = execute_tool(tool, args)
+
+        results.append(result)
+
+    return results
+
+
+# -----------------------------
+# SAFE JSON PARSER
+# -----------------------------
+def extract_json(text):
+
+    try:
+        start = text.index("{")
+        end = text.rindex("}") + 1
+        json_str = text[start:end]
+        return json.loads(json_str)
+    except:
+        return None
 
 
 # -----------------------------
@@ -75,41 +109,21 @@ def autonomous_loop(task, max_steps=6):
 
 
 # -----------------------------
-# SAFE JSON PARSER
-# -----------------------------
-def extract_json(text):
-
-    try:
-        start = text.index("{")
-        end = text.rindex("}") + 1
-        json_str = text[start:end]
-        return json.loads(json_str)
-    except:
-        return None
-
-
-# -----------------------------
 # MAIN AGENT
 # -----------------------------
 def ask_agent(prompt):
 
     state.set_task(prompt)
 
-    # -----------------------------
     # VECTOR MEMORY
-    # -----------------------------
     store_memory(prompt)
     related_memory = search_memory(prompt)
 
-    # -----------------------------
     # PLANNER AGENT
-    # -----------------------------
     plan = create_plan(prompt)
     state.add_step(plan)
 
-    # -----------------------------
     # SYSTEM PROMPT
-    # -----------------------------
     system_prompt = f"""
 You are an autonomous AI coding agent.
 
@@ -127,9 +141,9 @@ TOOLS AVAILABLE:
 4. run_python(file)
 5. create_folder(path)
 
-If a task requires tools respond ONLY with JSON.
+You may execute a single tool OR multiple tasks.
 
-Example:
+Single tool format:
 
 {{
  "tool": "write_file",
@@ -138,6 +152,17 @@ Example:
    "content": "print('Hello World')"
  }}
 }}
+
+Multi-task format:
+
+{{
+ "tasks":[
+   {{"tool":"create_folder","args":{{"path":"project"}}}},
+   {{"tool":"write_file","args":{{"path":"project/app.py","content":"print('hello')"}}}}
+ ]
+}}
+
+Respond ONLY with JSON if using tools.
 
 Relevant memory:
 {related_memory}
@@ -149,16 +174,14 @@ Current plan:
     add_memory("user", prompt)
 
     messages = get_memory()
-    messages = messages[-4:]
+    messages = messages[-6:]
 
     messages.insert(0, {
         "role": "system",
         "content": system_prompt
     })
 
-    # -----------------------------
-    # CALL OLLAMA
-    # -----------------------------
+    # CALL MODEL
     print("Calling Ollama model...")
 
     response = ollama.chat(
@@ -179,6 +202,18 @@ Current plan:
 
     if tool_data:
 
+        # MULTI TASK MODE
+        if "tasks" in tool_data:
+
+            print("Executing multiple tasks...")
+
+            results = execute_task_list(tool_data["tasks"])
+
+            add_memory("assistant", str(results))
+
+            return results
+
+        # SINGLE TOOL MODE
         tool = tool_data.get("tool")
         args = tool_data.get("args", {})
 
@@ -205,7 +240,7 @@ Current plan:
         return debug_result
 
     # -----------------------------
-    # AUTO CODE DETECTION + SELF DEBUG
+    # AUTO CODE DETECTION
     # -----------------------------
     if "```python" in answer:
 
@@ -225,23 +260,6 @@ Current plan:
 
             print("Execution Result:", result)
 
-            # -----------------------------
-            # ERROR DETECTION
-            # -----------------------------
-            if "error" in str(result).lower() or "traceback" in str(result).lower():
-
-                print("Error detected. Sending to debugger agent...")
-
-                fixed_code = debug_error(result)
-
-                write_file(filename, fixed_code)
-
-                print("Running fixed code...")
-
-                result = run_python(filename)
-
-                print("Fixed Execution Result:", result)
-
             add_memory("assistant", str(result))
 
             return result
@@ -249,9 +267,7 @@ Current plan:
         except Exception as e:
             print("Code execution failed:", e)
 
-    # -----------------------------
     # NORMAL RESPONSE
-    # -----------------------------
     add_memory("assistant", answer)
 
     state.add_history(answer)
