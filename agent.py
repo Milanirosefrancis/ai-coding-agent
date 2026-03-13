@@ -1,14 +1,20 @@
 import ollama
 import json
+import re
 
 from supabase_memory import get_memory, add_memory
-from tools import list_files, read_file, write_file, run_python, create_folder
+from tools.file_tools import list_files, read_file, write_file, run_python, create_folder
+from tools.universal_link_analyzer import analyze_link
 from vector_memory import store_memory, search_memory
 
 # Multi-Agent imports
 from core.planner_agent import create_plan
 from core.coder_agent import generate_flask_project
+from core.project_planner import generate_project_structure
 from core.debugger_agent import debug_error
+
+from tools.github_analyzer import analyze_github_repo
+from tools.web_analyzer import analyze_webpage
 
 from state_manager import AgentState
 
@@ -42,6 +48,14 @@ def execute_tool(tool, args):
 
     elif tool == "run_python":
         result = run_python(args.get("file"))
+
+    elif tool == "analyze_github":
+        result = analyze_github_repo(args.get("url"))
+
+    elif tool == "analyze_web":
+        result = analyze_webpage(args.get("url"))
+    elif tool == "analyze_link":
+        result = analyze_link(args.get("url"))
 
     else:
         result = "Unknown tool"
@@ -87,6 +101,24 @@ def extract_json(text):
 
 
 # -----------------------------
+# LINK DETECTOR
+# -----------------------------
+def detect_link(text):
+
+    urls = re.findall(r'https?://[^\s]+', text)
+
+    if not urls:
+        return None
+
+    url = urls[0]
+
+    if "github.com" in url:
+        return {"tool": "analyze_github", "args": {"url": url}}
+
+    return {"tool": "analyze_link", "args": {"url": url}}
+
+
+# -----------------------------
 # AUTONOMOUS LOOP
 # -----------------------------
 def autonomous_loop(task, max_steps=6):
@@ -116,15 +148,58 @@ def ask_agent(prompt):
 
     state.set_task(prompt)
 
+    # -----------------------------
+    # CHECK IF USER SENT A LINK
+    # -----------------------------
+    link_tool = detect_link(prompt)
+
+    if link_tool:
+        print("Detected URL. Running analyzer tool...")
+
+        result = execute_tool(
+            link_tool["tool"],
+            link_tool["args"]
+        )
+
+        summary_prompt = f"""
+Summarize the following project or webpage.
+
+Explain:
+- What it is
+- What it does
+- Technologies used
+- Key features
+
+Content:
+{result}
+"""
+
+        response = ollama.chat(
+            model=MODEL,
+            messages=[{"role": "user", "content": summary_prompt}]
+        )
+
+        summary = response["message"]["content"]
+
+        print("\nProject Summary:\n", summary)
+
+        return summary
+
+    # -----------------------------
     # VECTOR MEMORY
+    # -----------------------------
     store_memory(prompt)
     related_memory = search_memory(prompt)
 
+    # -----------------------------
     # PLANNER AGENT
+    # -----------------------------
     plan = create_plan(prompt)
     state.add_step(plan)
 
+    # -----------------------------
     # SYSTEM PROMPT
+    # -----------------------------
     system_prompt = f"""
 You are an autonomous AI coding agent.
 
@@ -141,6 +216,9 @@ TOOLS AVAILABLE:
 3. write_file(path, content)
 4. run_python(file)
 5. create_folder(path)
+6. analyze_github(url)
+7. analyze_web(url)
+8. analyze_link(url)
 
 You may execute a single tool OR multiple tasks.
 
@@ -182,7 +260,9 @@ Current plan:
         "content": system_prompt
     })
 
+    # -----------------------------
     # CALL MODEL
+    # -----------------------------
     print("Calling Ollama model...")
 
     response = ollama.chat(
@@ -195,10 +275,26 @@ Current plan:
     answer = response["message"]["content"]
 
     print("\nModel Output:\n", answer)
+
+    # -----------------------------
+    # AUTONOMOUS PROJECT BUILDER
+    # -----------------------------
+    if "build project" in prompt.lower():
+
+        project_name = "ai_generated_app"
+
+        print("Generating full project structure...")
+
+        project_tasks = generate_project_structure(project_name)
+
+        results = execute_task_list(project_tasks["tasks"])
+
+        return results
+
     # -----------------------------
     # FLASK PROJECT GENERATION
     # -----------------------------
-    if "flask api" in answer.lower() or "flask project" in answer.lower():
+    if "flask api" in prompt.lower() or "flask project" in prompt.lower():
 
         project_name = "flask_api"
 
@@ -217,7 +313,6 @@ Current plan:
 
     if tool_data:
 
-        # MULTI TASK MODE
         if "tasks" in tool_data:
 
             print("Executing multiple tasks...")
@@ -228,7 +323,6 @@ Current plan:
 
             return results
 
-        # SINGLE TOOL MODE
         tool = tool_data.get("tool")
         args = tool_data.get("args", {})
 
@@ -282,7 +376,9 @@ Current plan:
         except Exception as e:
             print("Code execution failed:", e)
 
+    # -----------------------------
     # NORMAL RESPONSE
+    # -----------------------------
     add_memory("assistant", answer)
 
     state.add_history(answer)
