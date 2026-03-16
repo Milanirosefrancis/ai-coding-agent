@@ -6,6 +6,7 @@ from supabase_memory import get_memory, add_memory
 from tools.file_tools import list_files, read_file, write_file, run_python, create_folder
 from tools.universal_link_analyzer import analyze_link
 from vector_memory import store_memory, search_memory
+from tools.github_python_analyzer import analyze_github_python
 
 # Multi-Agent imports
 from core.planner_agent import create_plan
@@ -54,8 +55,13 @@ def execute_tool(tool, args):
 
     elif tool == "analyze_web":
         result = analyze_webpage(args.get("url"))
+
     elif tool == "analyze_link":
         result = analyze_link(args.get("url"))
+
+    # ✅ NEW TOOL
+    elif tool == "analyze_python_repo":
+        result = analyze_github_python(args.get("url"))
 
     else:
         result = "Unknown tool"
@@ -112,8 +118,9 @@ def detect_link(text):
 
     url = urls[0]
 
+    # ✅ detect github repo
     if "github.com" in url:
-        return {"tool": "analyze_github", "args": {"url": url}}
+        return {"tool": "analyze_python_repo", "args": {"url": url}}
 
     return {"tool": "analyze_link", "args": {"url": url}}
 
@@ -154,6 +161,7 @@ def ask_agent(prompt):
     link_tool = detect_link(prompt)
 
     if link_tool:
+
         print("Detected URL. Running analyzer tool...")
 
         result = execute_tool(
@@ -219,6 +227,7 @@ TOOLS AVAILABLE:
 6. analyze_github(url)
 7. analyze_web(url)
 8. analyze_link(url)
+9. analyze_python_repo(url)
 
 You may execute a single tool OR multiple tasks.
 
